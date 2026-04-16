@@ -1,0 +1,9 @@
+F7
+    if [ -f /tmp/ffmpeg.pid ] && kill -0 "$(cat /tmp/ffmpeg.pid 2>/dev/null)" 2>/dev/null; then \
+        kill -INT "$(cat /tmp/ffmpeg.pid)"; \
+        rm -f /tmp/ffmpeg.pid; \
+        notify-send "Recording stopped"; \
+    else \
+        ~/.local/bin/record_all.sh; \
+        notify-send "Recording started"; \
+    fi
