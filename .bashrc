@@ -1,5 +1,5 @@
 # .bashrc
-
+[ -f /etc/bashrc ] && source /etc/bashrc
 # Only run in interactive shells
 case $- in
   *i*) ;;
@@ -9,7 +9,7 @@ esac
 # --- Oh My Bash ---
 export OSH="$HOME/.oh-my-bash"
 
-OSH_THEME="font"
+OSH_THEME="wanelo"
 
 # Keep this minimal
 plugins=(
@@ -27,7 +27,6 @@ OMB_TERM_USE_TPUT=no
 source "$OSH/oh-my-bash.sh"
 
 [ -f ~/.bash_aliases ] && source ~/.bash_aliases
-[ -f /etc/bashrc ] && source /etc/bashrc
 
 # Ensure sxhkd is running
 if ! pgrep -x sxhkd >/dev/null; then
