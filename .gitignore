@@ -1,0 +1,52 @@
+# =========================
+# SYSTEM / RUNTIME STUFF
+# =========================
+
+# Local caches (never track)
+.cache/
+.local/share/
+.local/state/
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# =========================
+# SHELL / HISTORY
+# =========================
+
+.bash_history
+.zsh_history
+
+# =========================
+# CONFIG GENERATED AT RUNTIME
+# =========================
+
+# PulseAudio / PipeWire state (machine-specific)
+.config/pulse/
+.config/pipewire/
+
+# GTK / Qt caches
+.config/gtk-*
+.config/qt*
+
+# =========================
+# GIT ITSELF
+# =========================
+
+.git/
+
+# =========================
+# OPTIONAL (ONLY IF THEY EXIST)
+# =========================
+
+# Uncomment if needed:
+.config/google-chrome/
+.config/BraveSoftware/
+.mozilla/
