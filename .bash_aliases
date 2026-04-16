@@ -4,6 +4,7 @@ mkcd() {
 }
 
 s() {
+	stow -d ~/dotfiles -t ~ -R .
 	. ~/.bashrc
 	pkill -USR1 sxhkd	
 }
