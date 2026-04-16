@@ -1,0 +1,9 @@
+[Unit]
+Description=sxhkd hotkey daemon
+
+[Service]
+ExecStart=/usr/bin/sxhkd
+Restart=always
+
+[Install]
+WantedBy=default.target
