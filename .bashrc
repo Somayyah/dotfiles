@@ -1,22 +1,43 @@
 # .bashrc
 
-# Source global definitions
-if [ -f /etc/bashrc ]; then
-    . /etc/bashrc
-fi
+# Only run in interactive shells
+case $- in
+  *i*) ;;
+    *) return;;
+esac
 
-if [ -f ~/.bash_aliases ]; then
-	. ~/.bash_aliases
+# --- Oh My Bash ---
+export OSH="$HOME/.oh-my-bash"
+
+OSH_THEME="font"
+
+# Keep this minimal
+plugins=(
+  git
+)
+
+# Optional — keep light
+completions=(
+  git
+)
+
+OMB_DEFAULT_ALIASES="check"
+OMB_TERM_USE_TPUT=no
+
+source "$OSH/oh-my-bash.sh"
+
+[ -f ~/.bash_aliases ] && source ~/.bash_aliases
+[ -f /etc/bashrc ] && source /etc/bashrc
+
+# Ensure sxhkd is running
+if ! pgrep -x sxhkd >/dev/null; then
+    nohup sxhkd >/dev/null 2>&1 &
 fi
- 
 # User specific environment
 if ! [[ "$PATH" =~ "$HOME/.local/bin:$HOME/bin:" ]]; then
     PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 fi
 export PATH
-
-# Uncomment the following line if you don't like systemctl's auto-paging feature:
-# export SYSTEMD_PAGER=
 
 # User specific aliases and functions
 if [ -d ~/.bashrc.d ]; then
@@ -28,3 +49,10 @@ if [ -d ~/.bashrc.d ]; then
 fi
 unset rc
 
+export LESS_TERMCAP_mb=$'\E[1;31m'
+export LESS_TERMCAP_md=$'\E[1;36m'
+export LESS_TERMCAP_me=$'\E[0m'
+export LESS_TERMCAP_se=$'\E[0m'
+export LESS_TERMCAP_so=$'\E[1;44;33m'
+export LESS_TERMCAP_ue=$'\E[0m'
+export LESS_TERMCAP_us=$'\E[1;32m'
