@@ -50,3 +50,4 @@ logs/
 .config/google-chrome/
 .config/BraveSoftware/
 .mozilla/
+.config/systemd/user/default.target.wants/
