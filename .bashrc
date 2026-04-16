@@ -56,4 +56,8 @@ export LESS_TERMCAP_so=$'\E[1;44;33m'
 export LESS_TERMCAP_ue=$'\E[0m'
 export LESS_TERMCAP_us=$'\E[1;32m'
 
-fastfetch
+if [[ $- == *i* ]]; then
+	if [[ -z "$SSH_CONNECTION" ]]; then
+		fastfetch
+    	fi
+fi
