@@ -7,7 +7,6 @@ F7
         notify-send "Recording stopped"; \
     else \
         ~/.local/bin/record_all.sh; \
-        notify-send "Recording started"; \
     fi
 
 # PAUSE & CONT Recording
