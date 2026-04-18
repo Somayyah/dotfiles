@@ -1,26 +1,7 @@
 # START & STOP Recording
-
 F7
-    if [ -f /tmp/ffmpeg.pid ] && kill -0 "$(cat /tmp/ffmpeg.pid 2>/dev/null)" 2>/dev/null; then \
-        kill -INT "$(cat /tmp/ffmpeg.pid)"; \
-        rm -f /tmp/ffmpeg.pid /tmp/ffmpeg.state; \
-        notify-send "Recording stopped"; \
-    else \
-        ~/.local/bin/record_all.sh; \
-    fi
+    ~/.local/bin/record_toggle.sh
 
-# PAUSE & CONT Recording
-
+# PAUSE & RESUME Recording
 F10
-    pid=$(cat /tmp/ffmpeg.pid 2>/dev/null); \
-    state_file="/tmp/ffmpeg.state"; \
-    [ -z "$pid" ] && notify-send "No recording" && exit 0; \
-    [ ! -f "$state_file" ] && echo "running" > "$state_file"; \
-    state=$(cat "$state_file"); \
-    if [ "$state" = "running" ]; then \
-        kill -STOP "$pid" 2>/dev/null && echo "paused" > "$state_file"; \
-        notify-send "⏸ PAUSED"; \
-    else \
-        kill -CONT "$pid" 2>/dev/null && echo "running" > "$state_file"; \
-        notify-send "▶ RESUMED"; \
-    fi
+    ~/.local/bin/record_pause.sh
