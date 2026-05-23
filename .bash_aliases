@@ -4,10 +4,13 @@ mkcd() {
 }
 
 s() {
+	clear
 	stow -d ~/dotfiles -t ~ -R .
 	. ~/.bashrc
 	pkill -USR1 sxhkd	
 }
+
+alias glow="glow -p"
 
 kkeys() {
 cat << 'EOF'
