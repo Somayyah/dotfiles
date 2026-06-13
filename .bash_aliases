@@ -3,6 +3,10 @@ mkcd() {
 	cd "${1}"
 }
 
+gen_D() {
+	bash ~/ysap/code/2025-09-26-what-is-an-inode/make-diagram	
+}
+
 s() {
 	clear
 	stow -d ~/dotfiles -t ~ -R .
