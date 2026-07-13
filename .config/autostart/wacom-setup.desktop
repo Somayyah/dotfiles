@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Wacom Setup
+Exec=wacom-setup.sh
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

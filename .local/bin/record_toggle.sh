@@ -38,6 +38,7 @@ if [ -n "$LIVE_PID" ]; then
             -c copy "$final"; then
             while IFS= read -r seg; do rm -f "$seg"; done < "$SEGMENTS_FILE"
             notify-send "⏹ Recording saved" "$final"
+            (~/.local/bin/clean_audio.sh "$final" && notify-send "🔊 Audio cleaned" "$final") &
         else
             notify-send "Merge FAILED" "Segments kept — check /tmp/ffmpeg_concat.txt"
         fi
@@ -46,6 +47,7 @@ if [ -n "$LIVE_PID" ]; then
         final="${first_seg/_seg1.mkv/.mkv}"
         mv "$first_seg" "$final"
         notify-send "⏹ Recording saved" "$final"
+        (~/.local/bin/clean_audio.sh "$final" && notify-send "🔊 Audio cleaned" "$final") &
     fi
 
     rm -f "$SEGMENTS_FILE" /tmp/ffmpeg_concat.txt /tmp/ffmpeg.session

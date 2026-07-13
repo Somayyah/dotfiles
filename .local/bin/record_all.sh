@@ -31,7 +31,7 @@ nohup ffmpeg -hide_banner \
   -filter_complex "
     [1:a]highpass=f=80,
          lowpass=f=18000,
-         anlmdn=s=0.00005:p=0.002:r=0.006,
+         afftdn=nr=25:nt=w,
          acompressor=threshold=-22dB:ratio=3:attack=5:release=80:makeup=2[aout]
   " \
   -map 0:v \

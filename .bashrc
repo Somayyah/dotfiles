@@ -64,3 +64,7 @@ fi
 
 export ANDROID_HOME=$HOME/Android/Sdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools
+
+# opencode
+export PATH=/home/watari/.opencode/bin:$PATH
+export PATH=/home/watari/Applications:/home/watari/go/bin/:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.opencode/bin:/home/watari/.local/bin:/home/watari/bin:/usr/lib64/ccache:/usr/local/bin:/usr/bin:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools:/home/watari/Android/Sdk/platform-tools

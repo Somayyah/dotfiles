@@ -5,3 +5,7 @@ F7
 # PAUSE & RESUME Recording
 F10
     ~/.local/bin/record_pause.sh
+
+# CLEAN latest recording audio
+F8
+    ~/.local/bin/clean_audio.sh "$(ls -t ~/REC_*.mkv 2>/dev/null | grep -v '_clean' | head -1)"
