@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+CONFIG="$HOME/.config/stream.conf"
+[ -f "$CONFIG" ] && source "$CONFIG"
+
 usage() {
     echo "Usage: $(basename "$0") <platform> <stream-key-or-path>"
     echo ""
@@ -11,86 +14,179 @@ usage() {
     echo "  rtmp <url>     Custom RTMP URL"
     echo "  file <path>    Save to local file for testing"
     echo ""
-    echo "Audio tunables (env vars):"
-    echo "  BANDPASS     default: highpass=f=80,lowpass=f=18000"
-    echo "  NR           afftdn noise reduction (default: 25)"
-    echo "  GATE_THR     agate threshold (default: -35dB)"
-    echo "  COMP_THR     compressor threshold (default: -22dB)"
-    echo "  DESKTOP_VOL  desktop audio mix weight (default: 0.5)"
+    echo "Config: \$HOME/.config/stream.conf"
+    echo ""
+    echo "Env vars (override config):"
+    echo "  STREAM_TITLE=text        Text overlay on stream"
+    echo "  STREAM_AUDIO_MODE=mode   desktop|mic|mix|track"
+    echo "  STREAM_TRACK_FILE=file   Audio file to loop (mode=track)"
+    echo "  TRACK=file.mp3           (legacy) audio source"
+    echo "  MIC=1                    (legacy) use mic"
+    echo "  MIX=1                    (legacy) mix audio"
     exit 1
 }
 
 [ $# -ge 2 ] || usage
 
-PLATFORM="$1"
-KEY="$2"
+PLATFORM="$1"; KEY="$2"
 
-RESOLUTION=$(xdpyinfo | awk '/dimensions/{print $2}')
+# ── Resolve config with defaults ──────────────────────────────────────────────
+
+RESOLUTION="${STREAM_RESOLUTION:-$(xdpyinfo | awk '/dimensions/{print $2}')}"
 DISPLAY_VAL="${DISPLAY:-:0}"
-MIC="alsa_input.pci-0000_00_1f.3.analog-stereo"
-DESKTOP="alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"
 
-BANDPASS="${BANDPASS:-highpass=f=80,lowpass=f=18000}"
-NR="${NR:-25}"
-GATE_THR="${GATE_THR:--35dB}"
-COMP_THR="${COMP_THR:--22dB}"
-DESKTOP_VOL="${DESKTOP_VOL:-0.5}"
+MIC_DEV="${STREAM_MIC_DEVICE:-alsa_input.pci-0000_00_1f.3.analog-stereo}"
+DESKTOP_DEV="${STREAM_DESKTOP_DEVICE:-alsa_output.pci-0000_00_1f.3.analog-stereo.monitor}"
 
-# Warm up mic (wakes from SUSPENDED state)
-ffmpeg -f pulse -ar 48000 -i "$MIC" -t 1 -f null - 2>/dev/null || true
-sleep 1
+# ── Audio mode resolution (config file takes priority, then legacy env vars) ──
 
-echo "Screen: $RESOLUTION  |  Mic + Desktop audio"
+AUDIO_MODE="${STREAM_AUDIO_MODE:-}"
+if [ -z "$AUDIO_MODE" ]; then
+    if   [ -n "${TRACK:-}" ];      then AUDIO_MODE="track";
+    elif [ "${MIX:-}" = "1" ];      then AUDIO_MODE="mix";
+    elif [ "${MIC:-}" = "1" ];      then AUDIO_MODE="mic";
+    else                                 AUDIO_MODE="desktop"; fi
+fi
+
+TRACK_FILE="${STREAM_TRACK_FILE:-${TRACK:-}}"
+MIC_FILTER_LEVEL="${STREAM_MIC_FILTER:-heavy}"
+
+# ── Build audio chain ─────────────────────────────────────────────────────────
+
+case "$AUDIO_MODE" in
+    track)
+        if [ -z "$TRACK_FILE" ]; then
+            echo "ERROR: STREAM_AUDIO_MODE=track but no track file set (STREAM_TRACK_FILE)"
+            exit 1
+        fi
+        if [ ! -f "$TRACK_FILE" ]; then
+            echo "ERROR: file not found: $TRACK_FILE"
+            exit 1
+        fi
+        echo "Audio: Track ($TRACK_FILE)"
+        AUDIO_INPUTS=(-stream_loop -1 -i "$TRACK_FILE")
+        AUDIO_FILTER="[1:a]anull[aout]"
+        AUDIO_MAP="[aout]"
+        ;;
+    mic|mix)
+        echo "Audio: ${AUDIO_MODE^} ($MIC_FILTER_LEVEL filter)"
+        ffmpeg -f pulse -ar 48000 -i "$MIC_DEV" -t 1 -f null - 2>/dev/null || true
+        sleep 1
+
+        case "$MIC_FILTER_LEVEL" in
+            off|none)
+                MIC_CHAIN="anull"
+                ;;
+            light)
+                MIC_CHAIN="highpass=f=80,lowpass=f=16000,afftdn=nr=15:nt=w"
+                ;;
+            standard)
+                MIC_CHAIN="highpass=f=80,lowpass=f=16000,afftdn=nr=20:nt=w,agate=threshold=-40dB:ratio=2:attack=10:release=200:makeup=3,acompressor=threshold=-22dB:ratio=3:attack=5:release=100:makeup=2"
+                ;;
+            *)
+                MIC_CHAIN="highpass=f=80,lowpass=f=16000,afftdn=nr=25:nt=w,agate=threshold=-42dB:ratio=3:attack=5:release=150:makeup=4,acompressor=threshold=-24dB:ratio=4:attack=2:release=80:makeup=3,alimiter=limit=0dB:attack=5:release=50"
+                ;;
+        esac
+
+        if [ "$AUDIO_MODE" = "mic" ]; then
+            AUDIO_INPUTS=(-thread_queue_size 8192 -f pulse -ar 48000 -ac 2 -i "$MIC_DEV")
+            AUDIO_FILTER="[1:a]${MIC_CHAIN}[aout]"
+        else
+            AUDIO_INPUTS=(
+                -thread_queue_size 8192 -f pulse -ar 48000 -ac 2 -i "$MIC_DEV"
+                -thread_queue_size 8192 -f pulse -ar 48000 -ac 2 -i "$DESKTOP_DEV"
+            )
+            AUDIO_FILTER="[1:a]${MIC_CHAIN}[amic];[amic][2:a]amix=inputs=2:duration=longest:weights=1 0.5[aout]"
+        fi
+        AUDIO_MAP="[aout]"
+        ;;
+    *)
+        echo "Audio: Desktop"
+        AUDIO_INPUTS=(-thread_queue_size 8192 -f pulse -ar 48000 -ac 2 -i "$DESKTOP_DEV")
+        AUDIO_FILTER="[1:a]anull[aout]"
+        AUDIO_MAP="[aout]"
+        ;;
+esac
+
+# ── Build title overlay ───────────────────────────────────────────────────────
+
+TITLE="${STREAM_TITLE:-}"
+if [ -n "$TITLE" ]; then
+    printf '%s' "$TITLE" > /tmp/stream_title.txt
+    TITLE_SIZE="${STREAM_TITLE_SIZE:-28}"
+    echo "Title overlay: $TITLE"
+    VIDEO_FILTER="[0:v]drawtext=textfile=/tmp/stream_title.txt:fontsize=${TITLE_SIZE}:fontcolor=white@0.7:x=10:y=h-th-14:box=1:boxcolor=black@0.3:boxborderw=6[vout]"
+    VIDEO_MAP="[vout]"
+else
+    VIDEO_FILTER=""
+    VIDEO_MAP="0:v"
+fi
+
+# ── Ingest URLs ───────────────────────────────────────────────────────────────
+
+TWITCH_URL="${STREAM_TWITCH_URL:-rtmp://live.twitch.tv/app}"
+YOUTUBE_URL="${STREAM_YOUTUBE_URL:-rtmp://a.rtmp.youtube.com/live2}"
+
+# ── Platform ──────────────────────────────────────────────────────────────────
+
 case "$PLATFORM" in
     twitch)       echo "Mode: LIVE → Twitch" ;;
-    twitch-test)  echo "Mode: TEST → Twitch (bandwidth test, not public)" ;;
+    twitch-test)  echo "Mode: TEST → Twitch" ;;
     youtube)      echo "Mode: LIVE → YouTube" ;;
     rtmp)         echo "Mode: RTMP → $KEY" ;;
     file)         echo "Mode: FILE → $KEY" ;;
     *)            usage ;;
 esac
-echo "Press Ctrl+C to stop."
+echo "Resolution: $RESOLUTION  |  Press Ctrl+C to stop."
 
-AUDIO_FILTER="
-    [1:a]$BANDPASS,
-         afftdn=nr=$NR:nt=w:bn=0,
-         anlmdn=s=0.0001,
-         agate=threshold=$GATE_THR:attack=5:release=150:range=0,
-         acompressor=threshold=$COMP_THR:ratio=3:attack=5:release=80:makeup=2[amic];
-    [amic][2:a]amix=inputs=2:duration=longest:weights=1 $DESKTOP_VOL[aout]"
+# ── Encoding params ───────────────────────────────────────────────────────────
+
+FPS="${STREAM_FPS:-30}"
+FILE_FPS="${STREAM_FILE_FPS:-60}"
+PRESET="${STREAM_PRESET:-veryfast}"
+GOP="${STREAM_GOP:-120}"
+VIDEO_BITRATE="${STREAM_VIDEO_BITRATE:-2500k}"
+MAXRATE="${STREAM_MAXRATE:-3000k}"
+BUFSIZE="${STREAM_BUFSIZE:-5000k}"
+AUDIO_BITRATE="${STREAM_AUDIO_BITRATE:-160k}"
+FILE_AUDIO_BITRATE="${STREAM_FILE_AUDIO_BITRATE:-320k}"
+
+# x264 extra flags
+X264_OPTS=""
+[ -n "${STREAM_PROFILE:-}" ] && X264_OPTS="$X264_OPTS -profile:v ${STREAM_PROFILE}"
+[ -n "${STREAM_TUNE:-}" ]   && X264_OPTS="$X264_OPTS -tune ${STREAM_TUNE}"
+
+FILTER="${VIDEO_FILTER}${VIDEO_FILTER:+;}$AUDIO_FILTER"
+
+# ── Run ───────────────────────────────────────────────────────────────────────
 
 if [ "$PLATFORM" = "file" ]; then
     exec ffmpeg -hide_banner -loglevel info -stats \
         -thread_queue_size 8192 \
-        -f x11grab -framerate 30 -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
-        -thread_queue_size 8192 \
-        -f pulse -ar 48000 -ac 2 -i "$MIC" \
-        -thread_queue_size 8192 \
-        -f pulse -ar 48000 -ac 2 -i "$DESKTOP" \
-        -filter_complex "$AUDIO_FILTER" \
-        -map 0:v -map "[aout]" \
-        -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
-        -c:a aac -b:a 160k -ar 48000 \
+        -f x11grab -framerate "$FILE_FPS" -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
+        "${AUDIO_INPUTS[@]}" \
+        -filter_complex "$FILTER" \
+        -map "$VIDEO_MAP" -map "$AUDIO_MAP" \
+        -c:v libx264 -preset "$PRESET" -crf 20 -pix_fmt yuv420p \
+        -c:a libopus -b:a "$FILE_AUDIO_BITRATE" -application audio -vbr on -compression_level 10 \
         "$KEY"
 else
     case "$PLATFORM" in
-        twitch)       URL="rtmp://live.twitch.tv/app/$KEY" ;;
-        twitch-test)  URL="rtmp://live.twitch.tv/app/$KEY?bandwidthtest=true" ;;
-        youtube)      URL="rtmp://a.rtmp.youtube.com/live2/$KEY" ;;
+        twitch)       URL="$TWITCH_URL/$KEY" ;;
+        twitch-test)  URL="$TWITCH_URL/$KEY?bandwidthtest=true" ;;
+        youtube)      URL="$YOUTUBE_URL/$KEY" ;;
         rtmp)         URL="$KEY" ;;
     esac
     exec ffmpeg -hide_banner -loglevel info -stats \
         -thread_queue_size 8192 \
-        -f x11grab -framerate 30 -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
-        -thread_queue_size 8192 \
-        -f pulse -ar 48000 -ac 2 -i "$MIC" \
-        -thread_queue_size 8192 \
-        -f pulse -ar 48000 -ac 2 -i "$DESKTOP" \
-        -filter_complex "$AUDIO_FILTER" \
-        -map 0:v -map "[aout]" \
-        -c:v libx264 -preset veryfast -b:v 2500k -maxrate 3000k -bufsize 5000k \
-        -pix_fmt yuv420p -g 120 \
-        -c:a aac -b:a 160k -ar 48000 \
+        -f x11grab -framerate "$FPS" -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
+        "${AUDIO_INPUTS[@]}" \
+        -filter_complex "$FILTER" \
+        -map "$VIDEO_MAP" -map "$AUDIO_MAP" \
+        -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$MAXRATE" -bufsize "$BUFSIZE" \
+        $X264_OPTS \
+        -pix_fmt yuv420p -g "$GOP" \
+        -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
         -f flv -flvflags no_duration_filesize \
         "$URL"
 fi
