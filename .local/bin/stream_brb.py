@@ -2,7 +2,7 @@
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
-from gi.repository import Gtk, Gdk, GLib, Pango
+from gi.repository import Gtk, Gdk, GLib
 import os
 import time
 
@@ -21,9 +21,13 @@ win.fullscreen()
 win.set_keep_above(True)
 win.stick()
 
-rgba = Gdk.RGBA()
-rgba.parse("rgba(13, 13, 27, 1)")
-win.override_background_color(Gtk.StateFlags.NORMAL, rgba)
+css = Gtk.CssProvider()
+css.load_from_data(b"window { background-color: rgb(13, 13, 27); }")
+Gtk.StyleContext.add_provider_for_screen(
+    Gdk.Screen.get_default(),
+    css,
+    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+)
 
 win.connect("destroy", Gtk.main_quit)
 win.connect("key-press-event", lambda w, e: Gtk.main_quit())

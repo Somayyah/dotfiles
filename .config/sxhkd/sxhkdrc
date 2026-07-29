@@ -9,3 +9,11 @@ F10
 # CLEAN latest recording audio
 F8
     ~/.local/bin/clean_audio.sh "$(ls -t ~/REC_*.mkv 2>/dev/null | grep -v '_clean' | head -1)"
+
+# BRB toggle (stream break)
+F11
+    ~/.local/bin/stream_brb.sh
+
+# END stream + outro
+F12
+    ~/.local/bin/stream_outro.sh

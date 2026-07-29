@@ -5,30 +5,22 @@ CONFIG="$HOME/.config/stream.conf"
 [ -f "$CONFIG" ] && source "$CONFIG"
 
 usage() {
-    echo "Usage: $(basename "$0") <platform> <stream-key-or-path>"
+    echo "Usage: $(basename "$0") <twitch-key> <youtube-key>"
     echo ""
-    echo "Platforms:"
-    echo "  twitch         rtmp://live.twitch.tv/app/<key>"
-    echo "  twitch-test    Twitch bandwidth test (NOT live)"
-    echo "  youtube        rtmp://a.rtmp.youtube.com/live2/<key>"
-    echo "  rtmp <url>     Custom RTMP URL"
-    echo "  file <path>    Save to local file for testing"
-    echo ""
+    echo "Streams screen capture to Twitch AND YouTube simultaneously."
     echo "Config: \$HOME/.config/stream.conf"
     echo ""
     echo "Env vars (override config):"
     echo "  STREAM_TITLE=text        Text overlay on stream"
     echo "  STREAM_AUDIO_MODE=mode   desktop|mic|mix|track"
     echo "  STREAM_TRACK_FILE=file   Audio file to loop (mode=track)"
-    echo "  TRACK=file.mp3           (legacy) audio source"
-    echo "  MIC=1                    (legacy) use mic"
-    echo "  MIX=1                    (legacy) mix audio"
     exit 1
 }
 
 [ $# -ge 2 ] || usage
 
-PLATFORM="$1"; KEY="$2"
+TWITCH_KEY="$1"
+YOUTUBE_KEY="$2"
 
 # ── Resolve config with defaults ──────────────────────────────────────────────
 
@@ -38,7 +30,7 @@ DISPLAY_VAL="${DISPLAY:-:0}"
 MIC_DEV="${STREAM_MIC_DEVICE:-alsa_input.pci-0000_00_1f.3.analog-stereo}"
 DESKTOP_DEV="${STREAM_DESKTOP_DEVICE:-alsa_output.pci-0000_00_1f.3.analog-stereo.monitor}"
 
-# ── Audio mode resolution (config file takes priority, then legacy env vars) ──
+# ── Audio mode resolution ─────────────────────────────────────────────────────
 
 AUDIO_MODE="${STREAM_AUDIO_MODE:-}"
 if [ -z "$AUDIO_MODE" ]; then
@@ -127,24 +119,15 @@ fi
 TWITCH_URL="${STREAM_TWITCH_URL:-rtmp://live.twitch.tv/app}"
 YOUTUBE_URL="${STREAM_YOUTUBE_URL:-rtmp://a.rtmp.youtube.com/live2}"
 
-# ── Platform ──────────────────────────────────────────────────────────────────
-
-case "$PLATFORM" in
-    twitch)       echo "Mode: LIVE → Twitch" ;;
-    twitch-test)  echo "Mode: TEST → Twitch" ;;
-    youtube)      echo "Mode: LIVE → YouTube" ;;
-    rtmp)         echo "Mode: RTMP → $KEY" ;;
-    file)         echo "Mode: FILE → $KEY" ;;
-    *)            usage ;;
-esac
+echo "Mode: LIVE → Twitch + YouTube"
 echo "Resolution: $RESOLUTION  |  Press Ctrl+C to stop."
 
-# ── Intro video (before going live) ──────────────────────────────────────────
+# ── Intro video (before going live) ───────────────────────────────────────────
 
 INTRO_VIDEO="${INTRO_VIDEO:-}"
 INTRO_DURATION="${INTRO_DURATION:-300}"
 
-if [ "$PLATFORM" != "file" ] && [ -n "$INTRO_VIDEO" ] && [ -f "$INTRO_VIDEO" ]; then
+if [ -n "$INTRO_VIDEO" ] && [ -f "$INTRO_VIDEO" ]; then
     echo "Intro: $INTRO_VIDEO (${INTRO_DURATION}s — press Q or Esc to skip)"
     timeout "$INTRO_DURATION" ffplay -fs -infbuf -nostats -loglevel quiet "$INTRO_VIDEO" 2>/dev/null || true
 fi
@@ -152,16 +135,13 @@ fi
 # ── Encoding params ───────────────────────────────────────────────────────────
 
 FPS="${STREAM_FPS:-30}"
-FILE_FPS="${STREAM_FILE_FPS:-60}"
 PRESET="${STREAM_PRESET:-veryfast}"
 GOP="${STREAM_GOP:-120}"
 VIDEO_BITRATE="${STREAM_VIDEO_BITRATE:-2500k}"
 MAXRATE="${STREAM_MAXRATE:-3000k}"
 BUFSIZE="${STREAM_BUFSIZE:-5000k}"
 AUDIO_BITRATE="${STREAM_AUDIO_BITRATE:-160k}"
-FILE_AUDIO_BITRATE="${STREAM_FILE_AUDIO_BITRATE:-320k}"
 
-# x264 extra flags
 X264_OPTS=""
 [ -n "${STREAM_PROFILE:-}" ] && X264_OPTS="$X264_OPTS -profile:v ${STREAM_PROFILE}"
 [ -n "${STREAM_TUNE:-}" ]   && X264_OPTS="$X264_OPTS -tune ${STREAM_TUNE}"
@@ -170,33 +150,15 @@ FILTER="${VIDEO_FILTER}${VIDEO_FILTER:+;}$AUDIO_FILTER"
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 
-if [ "$PLATFORM" = "file" ]; then
-    exec ffmpeg -hide_banner -loglevel info -stats \
-        -thread_queue_size 8192 \
-        -f x11grab -framerate "$FILE_FPS" -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
-        "${AUDIO_INPUTS[@]}" \
-        -filter_complex "$FILTER" \
-        -map "$VIDEO_MAP" -map "$AUDIO_MAP" \
-        -c:v libx264 -preset "$PRESET" -crf 20 -pix_fmt yuv420p \
-        -c:a libopus -b:a "$FILE_AUDIO_BITRATE" -application audio -vbr on -compression_level 10 \
-        "$KEY"
-else
-    case "$PLATFORM" in
-        twitch)       URL="$TWITCH_URL/$KEY" ;;
-        twitch-test)  URL="$TWITCH_URL/$KEY?bandwidthtest=true" ;;
-        youtube)      URL="$YOUTUBE_URL/$KEY" ;;
-        rtmp)         URL="$KEY" ;;
-    esac
-    exec ffmpeg -hide_banner -loglevel info -stats \
-        -thread_queue_size 8192 \
-        -f x11grab -framerate "$FPS" -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
-        "${AUDIO_INPUTS[@]}" \
-        -filter_complex "$FILTER" \
-        -map "$VIDEO_MAP" -map "$AUDIO_MAP" \
-        -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$MAXRATE" -bufsize "$BUFSIZE" \
-        $X264_OPTS \
-        -pix_fmt yuv420p -g "$GOP" \
-        -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
-        -f flv -flvflags no_duration_filesize \
-        "$URL"
-fi
+exec ffmpeg -hide_banner -loglevel info -stats \
+    -thread_queue_size 8192 \
+    -f x11grab -framerate "$FPS" -video_size "$RESOLUTION" -i "$DISPLAY_VAL" \
+    "${AUDIO_INPUTS[@]}" \
+    -filter_complex "$FILTER" \
+    -map "$VIDEO_MAP" -map "$AUDIO_MAP" \
+    -c:v libx264 -preset "$PRESET" -b:v "$VIDEO_BITRATE" -maxrate "$MAXRATE" -bufsize "$BUFSIZE" \
+    $X264_OPTS \
+    -pix_fmt yuv420p -g "$GOP" \
+    -c:a aac -b:a "$AUDIO_BITRATE" -ar 48000 \
+    -f tee \
+    "[f=flv:flvflags=no_duration_filesize]$TWITCH_URL/$TWITCH_KEY|[f=flv:flvflags=no_duration_filesize]$YOUTUBE_URL/$YOUTUBE_KEY"

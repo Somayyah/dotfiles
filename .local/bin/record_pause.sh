@@ -32,7 +32,7 @@ elif [ "$STATE" = "paused" ]; then
     SESSION=$(cat /tmp/ffmpeg.session 2>/dev/null || echo "REC_$(date +%F_%H-%M-%S)")
     seg_count=$(wc -l < "$SEGMENTS_FILE" 2>/dev/null || echo 0)
     next_seg=$((seg_count + 1))
-    ~/.local/bin/record_all.sh "$SESSION" "$next_seg"
+    "$HOME/.local/bin/record_all.sh" "$SESSION" "$next_seg"
     notify-send "Recording resumed" "Segment $next_seg"
 
 else

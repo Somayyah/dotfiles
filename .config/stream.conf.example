@@ -1,0 +1,99 @@
+# Stream configuration
+# Uncomment and edit any option below. All values shown are the defaults.
+# Env vars with the same name override this file.
+
+# ── Video ─────────────────────────────────────────────────────────────────────
+
+# Capture resolution (default: auto-detect full screen)
+#STREAM_RESOLUTION="1920x1080"
+
+# FPS for streaming (twitch/youtube/rtmp)
+#STREAM_FPS=30
+
+# FPS for local file recording
+#STREAM_FILE_FPS=60
+
+# Video bitrate for streaming
+#STREAM_VIDEO_BITRATE="2500k"
+
+# Max bitrate (for VBR rate control)
+#STREAM_MAXRATE="3000k"
+
+# VBV buffer size
+#STREAM_BUFSIZE="5000k"
+
+# x264 preset: ultrafast superfast veryfast faster fast medium slow slower veryslow
+#STREAM_PRESET="veryfast"
+
+# Keyframe interval in frames (Twitch wants 2s: fps*2)
+#STREAM_GOP=120
+
+# H.264 profile: baseline main high
+#STREAM_PROFILE=""
+
+# x264 tune: film animation grain stillimage fastdecode zerolatency
+#STREAM_TUNE=""
+
+# ── Audio ─────────────────────────────────────────────────────────────────────
+
+# Audio mode: desktop | mic | mix | track
+# desktop  = system audio only
+# mic      = microphone only (with noise reduction)
+# mix      = mic + desktop mixed together
+# track    = audio file only (looped)
+#STREAM_AUDIO_MODE="desktop"
+
+# Audio bitrate for streaming (aac)
+#STREAM_AUDIO_BITRATE="160k"
+
+# Audio bitrate for local file recording (opus)
+#STREAM_FILE_AUDIO_BITRATE="320k"
+
+# PulseAudio microphone device
+#STREAM_MIC_DEVICE="alsa_input.pci-0000_00_1f.3.analog-stereo"
+
+# PulseAudio desktop (monitor) device
+#STREAM_DESKTOP_DEVICE="alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"
+
+# Audio track file to loop (only when mode=track)
+#STREAM_TRACK_FILE=""
+
+# Mic noise filter: off | light | standard | heavy
+#
+#   off      — raw mic, no processing
+#   light    — rumble cut + light denoise (low CPU)
+#   standard — denoise + noise gate + compressor  ← best for most setups
+#   heavy    — max denoise + gate + compressor + limiter
+#
+#STREAM_MIC_FILTER="standard"
+
+# ── Ingest ────────────────────────────────────────────────────────────────────
+
+# Custom Twitch ingest server (default: rtmp://live.twitch.tv/app)
+#STREAM_TWITCH_URL="rtmp://live.twitch.tv/app"
+
+# Custom YouTube ingest server (default: rtmp://a.rtmp.youtube.com/live2)
+#STREAM_YOUTUBE_URL="rtmp://a.rtmp.youtube.com/live2"
+
+# ── Overlays ──────────────────────────────────────────────────────────────────
+
+# Text overlay at bottom-left of stream (empty = no overlay)
+#STREAM_TITLE=""
+
+# Font size for the title overlay
+#STREAM_TITLE_SIZE=28
+
+# ── Break screen (stream_brb.sh) ──────────────────────────────────────────────
+
+# Video to play fullscreen during break (ffplay)
+#BRB_VIDEO="$HOME/livestream/BRB.mp4"
+
+# ── Intro / Outro ─────────────────────────────────────────────────────────────
+
+# Intro video — plays automatically when stream.sh starts (before going live)
+#INTRO_VIDEO="$HOME/livestream/starting_soon.mp4"
+#INTRO_DURATION=300   # seconds (default 300 = 5 min)
+
+# Outro video — triggered by stream_outro.sh (F12), loops for the duration
+#OUTRO_VIDEO="$HOME/livestream/end.mp4"
+#OUTRO_DURATION=300

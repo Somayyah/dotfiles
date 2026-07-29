@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG="$HOME/.config/stream.conf"
+[ -f "$CONFIG" ] && source "$CONFIG"
+
 name="${1:-REC_$(date +%F_%H-%M-%S)}"
 base="${name%.*}"
 # Segment index passed as second arg (default 1)
@@ -6,7 +11,7 @@ seg="${2:-1}"
 outfile="$HOME/${base}_seg${seg}.mkv"
 RESOLUTION=$(xdpyinfo | awk '/dimensions/{print $2}')
 DISPLAY_VAL="${DISPLAY:-:0}"
-MIC="alsa_input.pci-0000_00_1f.3.analog-stereo"
+MIC="${STREAM_MIC_DEVICE:-alsa_input.pci-0000_00_1f.3.analog-stereo}"
 
 # Warm up the mic source (wakes it from SUSPENDED state)
 ffmpeg -f pulse -ar 48000 -i "$MIC" -t 1 -f null - 2>/dev/null || true
