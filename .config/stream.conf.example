@@ -58,6 +58,9 @@
 # Audio track file to loop (only when mode=track)
 #STREAM_TRACK_FILE=""
 
+# Lofi music toggled via stream_lofi.sh hotkey (plays as desktop audio, captured in mix mode)
+#LOFI_TRACK="$HOME/livestream/lofi.mp3"
+
 # Mic noise filter: off | light | standard | heavy
 #
 #   off      — raw mic, no processing
@@ -74,6 +77,19 @@
 
 # Custom YouTube ingest server (default: rtmp://a.rtmp.youtube.com/live2)
 #STREAM_YOUTUBE_URL="rtmp://a.rtmp.youtube.com/live2"
+
+# ── Platform (for F1 hotkey start) ──────────────────────────────────────────
+
+# Platform: twitch | youtube | both
+#STREAM_PLATFORM="twitch"
+
+# Stream keys (stored here, never on the CLI)
+#STREAM_KEY_TWITCH=""
+#STREAM_KEY_YOUTUBE=""
+
+# Simultaneous local recording while streaming (teed output, no re-encode)
+#STREAM_RECORD=1
+#STREAM_RECORD_DIR="$HOME/livestream/recordings"
 
 # ── Overlays ──────────────────────────────────────────────────────────────────
 

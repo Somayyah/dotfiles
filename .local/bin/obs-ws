@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""obs-ws — Send commands to OBS via WebSocket. No GUI needed."""
+import socket, json, struct, hashlib, base64, os, sys, time, secrets
+
+HOST = "127.0.0.1"
+PORT = 4455
+PASSWORD = "EkYzjNaJxsGQotBW"
+REQUEST_ID = 0
+WS_BUFFER = bytearray()
+
+def ws_handshake(sock):
+    global WS_BUFFER
+    key = base64.b64encode(secrets.token_bytes(16)).decode()
+    req = (
+        f"GET / HTTP/1.1\r\n"
+        f"Host: {HOST}:{PORT}\r\n"
+        f"Upgrade: websocket\r\n"
+        f"Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {key}\r\n"
+        f"Sec-WebSocket-Version: 13\r\n"
+        f"\r\n"
+    )
+    sock.sendall(req.encode())
+    response = b""
+    while b"\r\n\r\n" not in response:
+        response += sock.recv(4096)
+    idx = response.find(b"\r\n\r\n") + 4
+    if idx < len(response):
+        WS_BUFFER = bytearray(response[idx:])
+
+def ws_send(sock, data):
+    payload = bytearray(json.dumps(data).encode())
+    mask_bytes = secrets.token_bytes(4)
+    for i in range(len(payload)):
+        payload[i] ^= mask_bytes[i % 4]
+    frame = bytearray()
+    frame.append(0x81 | 0x80)  # FIN + text opcode, masked
+    length = len(payload)
+    if length < 126:
+        frame.append(0x80 | length)
+    elif length < 65536:
+        frame.append(0x80 | 126)
+        frame.extend(struct.pack(">H", length))
+    else:
+        frame.append(0x80 | 127)
+        frame.extend(struct.pack(">Q", length))
+    frame.extend(mask_bytes)
+    sock.sendall(bytes(frame) + bytes(payload))
+
+def ws_recv(sock):
+    global WS_BUFFER
+    while True:
+        if len(WS_BUFFER) >= 2:
+            header = bytes(WS_BUFFER[:2])
+            del WS_BUFFER[:2]
+        else:
+            header = sock.recv(2)
+        if len(header) < 2:
+            return None
+        opcode = header[0] & 0x0F
+        if opcode == 8:
+            return None
+        masked = header[1] & 0x80
+        length = header[1] & 0x7F
+        if length == 126:
+            if len(WS_BUFFER) >= 2:
+                length = struct.unpack(">H", bytes(WS_BUFFER[:2]))[0]
+                del WS_BUFFER[:2]
+            else:
+                length = struct.unpack(">H", sock.recv(2))[0]
+        elif length == 127:
+            if len(WS_BUFFER) >= 8:
+                length = struct.unpack(">Q", bytes(WS_BUFFER[:8]))[0]
+                del WS_BUFFER[:8]
+            else:
+                length = struct.unpack(">Q", sock.recv(8))[0]
+        if masked:
+            if len(WS_BUFFER) >= 4:
+                del WS_BUFFER[:4]
+            else:
+                sock.recv(4)
+        payload = b""
+        if len(WS_BUFFER) >= length:
+            payload = bytes(WS_BUFFER[:length])
+            del WS_BUFFER[:length]
+        else:
+            payload = bytes(WS_BUFFER)
+            del WS_BUFFER[:]
+            remaining = length - len(payload)
+            if remaining > 0:
+                payload += sock.recv(remaining)
+        if opcode == 0x01:
+            return json.loads(payload.decode())
+
+def send_request(sock, request_type, request_data=None):
+    global REQUEST_ID
+    REQUEST_ID += 1
+    msg = {
+        "op": 6,
+        "d": {
+            "requestType": request_type,
+            "requestId": str(REQUEST_ID),
+            "requestData": request_data or {}
+        }
+    }
+    ws_send(sock, msg)
+    while True:
+        resp = ws_recv(sock)
+        if resp is None:
+            return None
+        if resp.get("op") == 7 and resp["d"].get("requestId") == str(REQUEST_ID):
+            return resp["d"]
+
+def connect():
+    global WS_BUFFER
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(5)
+    sock.connect((HOST, PORT))
+    ws_handshake(sock)
+
+    hello = ws_recv(sock)
+    if hello is None or hello.get("op") != 0:
+        sock.close()
+        sys.exit(1)
+
+    auth_info = hello["d"].get("authentication", {})
+    if auth_info:
+        challenge = auth_info["challenge"]
+        salt = auth_info["salt"]
+        secret = base64.b64encode(
+            hashlib.sha256(
+                hashlib.sha256(
+                    (PASSWORD + salt).encode()
+                ).digest() + challenge.encode()
+            ).digest()
+        ).decode()
+        ws_send(sock, {
+            "op": 1,
+            "d": {"rpcVersion": 1, "authentication": secret, "eventSubscriptions": 0}
+        })
+    else:
+        ws_send(sock, {"op": 1, "d": {"rpcVersion": 1, "eventSubscriptions": 0}})
+
+    identified = ws_recv(sock)
+    if identified is None or identified.get("op") != 2:
+        sock.close()
+        sys.exit(1)
+
+    return sock
+
+
+def cmd_scene(sock, name):
+    send_request(sock, "SetCurrentProgramScene", {"sceneName": name})
+
+def cmd_toggle_scene(sock, scene_a, scene_b):
+    resp = send_request(sock, "GetCurrentProgramScene")
+    if resp is None:
+        return
+    current = resp.get("responseData", {}).get("currentProgramSceneName", "")
+    target = scene_b if current == scene_a else scene_a
+    send_request(sock, "SetCurrentProgramScene", {"sceneName": target})
+
+def cmd_mute(sock, source):
+    resp = send_request(sock, "GetSourceMute", {"sourceName": source})
+    if resp is None:
+        return
+    muted = resp.get("responseData", {}).get("sourceMuted", False)
+    send_request(sock, "SetSourceMute", {"sourceName": source, "sourceMuted": not muted})
+
+def cmd_start_record(sock):
+    send_request(sock, "StartRecord")
+
+def cmd_stop_record(sock):
+    send_request(sock, "StopRecord")
+
+def cmd_toggle_record(sock):
+    resp = send_request(sock, "GetRecordStatus")
+    if resp is None:
+        return
+    active = resp.get("responseData", {}).get("outputActive", False)
+    if active:
+        send_request(sock, "StopRecord")
+    else:
+        send_request(sock, "StartRecord")
+
+def cmd_start_stream(sock):
+    send_request(sock, "StartStream")
+
+def cmd_stop_stream(sock):
+    send_request(sock, "StopStream")
+
+
+COMMANDS = {
+    "scene":         (cmd_scene,         1),
+    "toggle-scene":  (cmd_toggle_scene,  2),
+    "mute":          (cmd_mute,          1),
+    "start-record":  (cmd_start_record,  0),
+    "stop-record":   (cmd_stop_record,   0),
+    "toggle-record": (cmd_toggle_record, 0),
+    "start-stream":  (cmd_start_stream,  0),
+    "stop-stream":   (cmd_stop_stream,   0),
+}
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: obs-ws <cmd> [args...]")
+        print("Commands:", ", ".join(COMMANDS))
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    if cmd not in COMMANDS:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+
+    func, arg_count = COMMANDS[cmd]
+    args = sys.argv[2:]
+    if len(args) < arg_count:
+        print(f"Command '{cmd}' needs {arg_count} arg(s)")
+        sys.exit(1)
+
+    sock = connect()
+    try:
+        func(sock, *args[:arg_count])
+    finally:
+        sock.close()

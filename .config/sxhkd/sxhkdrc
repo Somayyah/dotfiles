@@ -1,19 +1,16 @@
-# START & STOP Recording
+# ── Streaming (OBS via obs-ws) ────────────────────────────────────────────
+
+F1
+    ~/.local/bin/stream_go_live.sh
+
 F7
-    ~/.local/bin/record_toggle.sh
+    ~/.local/bin/obs-ws mute 'Audio Input Capture (PulseAudio)'
 
-# PAUSE & RESUME Recording
-F10
-    ~/.local/bin/record_pause.sh
-
-# CLEAN latest recording audio
 F8
-    ~/.local/bin/clean_audio.sh "$(ls -t ~/REC_*.mkv 2>/dev/null | grep -v '_clean' | head -1)"
+    ~/.local/bin/stream_lofi.sh
 
-# BRB toggle (stream break)
-F11
-    ~/.local/bin/stream_brb.sh
+F9
+    ~/.local/bin/obs-ws toggle-scene 'Live' 'BRB'
 
-# END stream + outro
 F12
-    ~/.local/bin/stream_outro.sh
+    ~/.local/bin/stream_end.sh

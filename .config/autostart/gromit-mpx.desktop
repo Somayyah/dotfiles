@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Gromit-MPX
+Exec=gromit-mpx
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
