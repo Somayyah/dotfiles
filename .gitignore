@@ -57,3 +57,4 @@ logs/
 .mozilla/
 .config/systemd/user/default.target.wants/
 .config/stream.conf
+.config/stream.conf
