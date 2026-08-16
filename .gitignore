@@ -56,3 +56,4 @@ logs/
 .config/BraveSoftware/
 .mozilla/
 .config/systemd/user/default.target.wants/
+.config/stream.conf

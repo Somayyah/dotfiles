@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# ============================================================
+# git-push-all — push the current branch to all remotes in
+# priority order: gitea (origin) > codeberg > gitlab > github
+#
+# Rules:
+#   - origin (gitea) is ALWAYS pushed (primary git server)
+#   - codeberg/gitlab/github only receive the "public" branch
+#     (main by default), so feature/WIP branches stay local
+#     to gitea only.
+#
+# Override the public branch per repo:
+#   git config pushall.publicBranch master
+# Or per-run:
+#   PUBLIC_BRANCH=master git-push-all
+# ============================================================
+set -euo pipefail
+
+branch=$(git branch --show-current 2>/dev/null || true)
+if [ -z "$branch" ]; then
+  echo "error: not on a branch (detached HEAD)" >&2
+  exit 1
+fi
+
+# public branch: per-repo config, else env, else "main"
+public_branch=$(git config --get pushall.publicBranch 2>/dev/null || true)
+public_branch="${public_branch:-${PUBLIC_BRANCH:-main}}"
+
+PRIMARY=(origin)                      # gitea — always
+PUBLIC=(codeberg gitlab github)       # only the public branch
+
+# ---- push to primary (gitea) always ----
+for r in "${PRIMARY[@]}"; do
+  if git remote get-url "$r" &>/dev/null; then
+    echo "==> $r [$branch]"
+    git push "$r" "$branch" --tags
+  fi
+done
+
+# ---- push to public remotes only if on the public branch ----
+if [ "$branch" = "$public_branch" ]; then
+  for r in "${PUBLIC[@]}"; do
+    if git remote get-url "$r" &>/dev/null; then
+      echo "==> $r [$branch]"
+      git push "$r" "$branch" --tags || echo "  ! $r failed (repo may not exist there yet)"
+    fi
+  done
+else
+  echo "note: '$branch' != public branch '$public_branch' — pushed to gitea only"
+fi
+
+echo "done."
